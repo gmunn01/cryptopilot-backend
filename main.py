@@ -1,67 +1,82 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
+import requests
 import time
 import hmac
 import hashlib
-import requests
+import json
 
 app = FastAPI()
 
-class APIKeys(BaseModel):
+BYBIT_URL = "https://api.bybit.com"
+TRADE_ENDPOINT = "/v5/order/create"
+
+class TradeRequest(BaseModel):
     api_key: str
     secret_key: str
 
-def generate_signature(secret, message):
-    return hmac.new(
-        secret.encode("utf-8"),
-        message.encode("utf-8"),
-        hashlib.sha256
+@app.post("/place-trade")
+async def place_trade(req: TradeRequest):
+    print("\n==> Received API keys")
+    api_key = req.api_key
+    secret_key = req.secret_key
+
+    # Sample order params (XRPUSDT spot order)
+    symbol = "XRPUSDT"
+    side = "Buy"
+    order_type = "Market"
+    qty = "5"  # Adjust as needed
+    category = "spot"  # spot/linear/inverse
+
+    timestamp = str(int(time.time() * 1000))
+    recv_window = "5000"
+
+    params = {
+        "category": category,
+        "symbol": symbol,
+        "side": side,
+        "orderType": order_type,
+        "qty": qty,
+        "timestamp": timestamp,
+        "recvWindow": recv_window
+    }
+
+    # Step 1: Sort params alphabetically
+    sorted_params = dict(sorted(params.items()))
+    query_string = "&".join([f"{k}={v}" for k, v in sorted_params.items()])
+
+    # Step 2: Sign it
+    signature = hmac.new(
+        bytes(secret_key, "utf-8"),
+        msg=bytes(query_string, "utf-8"),
+        digestmod=hashlib.sha256,
     ).hexdigest()
 
-@app.post("/place-trade")
-def place_trade(keys: APIKeys):
+    headers = {
+        "X-BYBIT-API-KEY": api_key,
+        "X-BYBIT-SIGN": signature,
+        "X-BYBIT-TIMESTAMP": timestamp,
+        "X-BYBIT-RECV-WINDOW": recv_window,
+        "Content-Type": "application/json",
+    }
+
+    print("==> Sending request to ByBit...")
+    print("POST", BYBIT_URL + TRADE_ENDPOINT)
+    print("Headers:", headers)
+    print("Body:", json.dumps(params))
+
     try:
-        print("Received API keys:", keys.api_key, keys.secret_key)
-
-        url = "https://api.bybit.com/v5/order/create"
-        api_key = keys.api_key
-        secret_key = keys.secret_key
-        recv_window = "5000"
-        timestamp = str(int(time.time() * 1000))
-
-        payload = {
-            "category": "spot",
-            "symbol": "XRPUSDT",
-            "side": "Buy",
-            "orderType": "Market",
-            "qty": "10"
-        }
-
-        query_string = f"apiKey={api_key}&recvWindow={recv_window}&timestamp={timestamp}"
-        signature = generate_signature(secret_key, query_string)
-
-        headers = {
-            "X-BYBIT-API-KEY": api_key,
-            "Content-Type": "application/json"
-        }
-
-        print("Sending request to Bybit API...")
-
         response = requests.post(
-            url=f"{url}?{query_string}&sign={signature}",
+            BYBIT_URL + TRADE_ENDPOINT,
             headers=headers,
-            json=payload
+            data=json.dumps(params)
         )
 
-        print("Bybit response status code:", response.status_code)
-        print("Bybit response JSON:", response.json())
+        print("==> ByBit response status code:", response.status_code)
+        print("==> ByBit response body:", response.text)
 
-        return {
-            "message": "Trade attempted",
-            "status_code": response.status_code,
-            "bybit_response": response.json()
-        }
+        return {"status": "ok", "bybit_response": response.json()}
 
     except Exception as e:
-        print("Error occurred:", str(e))
-        return {"error": str(e)}
+        print("Error placing trade:", e)
+        return {"status": "error", "message": str(e)}
