@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from pydantic import BaseModel
 import requests
 import time
@@ -21,12 +21,12 @@ async def place_trade(req: TradeRequest):
     api_key = req.api_key
     secret_key = req.secret_key
 
-    # Sample order params (XRPUSDT spot order)
+    # Sample trade values
     symbol = "XRPUSDT"
     side = "Buy"
     order_type = "Market"
-    qty = "5"  # Adjust as needed
-    category = "spot"  # spot/linear/inverse
+    qty = "5"
+    category = "spot"
 
     timestamp = str(int(time.time() * 1000))
     recv_window = "5000"
@@ -41,11 +41,9 @@ async def place_trade(req: TradeRequest):
         "recvWindow": recv_window
     }
 
-    # Step 1: Sort params alphabetically
     sorted_params = dict(sorted(params.items()))
     query_string = "&".join([f"{k}={v}" for k, v in sorted_params.items()])
 
-    # Step 2: Sign it
     signature = hmac.new(
         bytes(secret_key, "utf-8"),
         msg=bytes(query_string, "utf-8"),
@@ -72,11 +70,16 @@ async def place_trade(req: TradeRequest):
             data=json.dumps(params)
         )
 
-        print("==> ByBit response status code:", response.status_code)
-        print("==> ByBit response body:", response.text)
+        print("==> Raw response:", response.text)
 
-        return {"status": "ok", "bybit_response": response.json()}
+        try:
+            data = response.json()
+            print("==> Parsed JSON:", data)
+            return {"status": "ok", "bybit_response": data}
+        except Exception as parse_err:
+            print("❌ JSON parse error:", parse_err)
+            return {"status": "error", "message": "Invalid JSON from ByBit", "raw": response.text}
 
     except Exception as e:
-        print("Error placing trade:", e)
+        print("❌ Error placing trade:", e)
         return {"status": "error", "message": str(e)}
