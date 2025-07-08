@@ -34,7 +34,7 @@ def place_trade(keys: APIKeys):
             "symbol": "XRPUSDT",
             "side": "Buy",
             "orderType": "Market",
-            "qty": "10"  # Test quantity
+            "qty": "10"
         }
 
         query_string = f"apiKey={api_key}&recvWindow={recv_window}&timestamp={timestamp}"
@@ -45,16 +45,23 @@ def place_trade(keys: APIKeys):
             "Content-Type": "application/json"
         }
 
-        full_url = f"{url}?{query_string}&sign={signature}"
+        print("Sending request to Bybit API...")
 
-        response = requests.post(full_url, headers=headers, json=payload)
-        print("ByBit Response:", response.status_code, response.text)
+        response = requests.post(
+            url=f"{url}?{query_string}&sign={signature}",
+            headers=headers,
+            json=payload
+        )
+
+        print("Bybit response status code:", response.status_code)
+        print("Bybit response JSON:", response.json())
 
         return {
-            "status": response.status_code,
+            "message": "Trade attempted",
+            "status_code": response.status_code,
             "bybit_response": response.json()
         }
 
     except Exception as e:
-        print("Error:", str(e))
+        print("Error occurred:", str(e))
         return {"error": str(e)}
