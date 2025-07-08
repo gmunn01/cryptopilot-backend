@@ -45,17 +45,16 @@ def place_trade(keys: APIKeys):
             "Content-Type": "application/json"
         }
 
-        print("Sending request to Bybit API...")
+        full_url = f"{url}?{query_string}&sign={signature}"
 
-        response = requests.post(
-            url=f"{url}?{query_string}&sign={signature}",
-            headers=headers,
-            json=payload
-        )
+        response = requests.post(full_url, headers=headers, json=payload)
+        print("ByBit Response:", response.status_code, response.text)
 
-        print("Response from Bybit:", response.text)
-        return response.json()
+        return {
+            "status": response.status_code,
+            "bybit_response": response.json()
+        }
 
     except Exception as e:
-        print("Error occurred:", str(e))
+        print("Error:", str(e))
         return {"error": str(e)}
