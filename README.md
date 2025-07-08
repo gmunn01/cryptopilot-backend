@@ -1,2 +1,3 @@
-# cryptopilot-backend
-API backend for CryptoPilot test trade panel
+# CryptoPilot Backend
+
+API backend for CryptoPilot test trade panel.
