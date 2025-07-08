@@ -17,11 +17,9 @@ class TradeRequest(BaseModel):
 
 @app.post("/place-trade")
 async def place_trade(req: TradeRequest):
-    print("\n==> Received API keys")
     api_key = req.api_key
     secret_key = req.secret_key
 
-    # Sample trade values
     symbol = "XRPUSDT"
     side = "Buy"
     order_type = "Market"
@@ -58,28 +56,21 @@ async def place_trade(req: TradeRequest):
         "Content-Type": "application/json",
     }
 
-    print("==> Sending request to ByBit...")
-    print("POST", BYBIT_URL + TRADE_ENDPOINT)
-    print("Headers:", headers)
-    print("Body:", json.dumps(params))
-
     try:
         response = requests.post(
             BYBIT_URL + TRADE_ENDPOINT,
             headers=headers,
-            data=json.dumps(params)
+            data=json.dumps(params),
+            timeout=10
         )
 
-        print("==> Raw response:", response.text)
+        print("==> Raw response:")
+        print(response.text)
 
         try:
-            data = response.json()
-            print("==> Parsed JSON:", data)
-            return {"status": "ok", "bybit_response": data}
-        except Exception as parse_err:
-            print("❌ JSON parse error:", parse_err)
-            return {"status": "error", "message": "Invalid JSON from ByBit", "raw": response.text}
+            return response.json()
+        except Exception as e:
+            return {"error": "JSON decode failed", "raw_response": response.text}
 
     except Exception as e:
-        print("❌ Error placing trade:", e)
-        return {"status": "error", "message": str(e)}
+        return {"error": str(e)}
