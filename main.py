@@ -4,6 +4,7 @@ import requests
 import time
 import hmac
 import hashlib
+import json
 
 app = FastAPI()
 
@@ -11,9 +12,9 @@ class APIKeys(BaseModel):
     api_key: str
     secret_key: str
 
-def generate_signature(api_key, secret_key, recv_window, timestamp, params=""):
-    query_string = f"{timestamp}{api_key}{recv_window}{params}"
-    signature = hmac.new(secret_key.encode(), query_string.encode(), hashlib.sha256).hexdigest()
+def generate_signature(secret_key, params):
+    param_str = '&'.join([f"{k}={v}" for k, v in params.items()])
+    signature = hmac.new(secret_key.encode(), param_str.encode(), hashlib.sha256).hexdigest()
     return signature
 
 @app.post("/place-trade")
@@ -33,19 +34,28 @@ def place_trade(keys: APIKeys):
             "qty": "10"
         }
 
-        params_string = ''.join([f"{key}{value}" for key, value in payload.items()])
-        signature = generate_signature(api_key, secret_key, recv_window, timestamp, params_string)
+        params = {
+            "apiKey": api_key,
+            "timestamp": timestamp,
+            "recvWindow": recv_window
+        }
+
+        # Merge both sets of parameters
+        all_params = {**params, **payload}
+        signature = generate_signature(secret_key, all_params)
 
         headers = {
             "X-BYBIT-API-KEY": api_key,
-            "X-BYBIT-SIGN": signature,
-            "X-BYBIT-TIMESTAMP": timestamp,
-            "X-BYBIT-RECV-WINDOW": recv_window,
+            "X-BYBIT-API-SIGN": signature,
+            "X-BYBIT-API-TIMESTAMP": timestamp,
+            "X-BYBIT-API-RECV-WINDOW": recv_window,
             "Content-Type": "application/json"
         }
 
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, headers=headers, json=payload)
         return response.json()
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
