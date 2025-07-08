@@ -1,3 +1,23 @@
+from fastapi import FastAPI
+from pydantic import BaseModel
+import time
+import hmac
+import hashlib
+import requests
+
+app = FastAPI()
+
+class APIKeys(BaseModel):
+    api_key: str
+    secret_key: str
+
+def generate_signature(secret, message):
+    return hmac.new(
+        secret.encode("utf-8"),
+        message.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+
 @app.post("/place-trade")
 def place_trade(keys: APIKeys):
     try:
@@ -27,16 +47,15 @@ def place_trade(keys: APIKeys):
 
         print("Sending request to Bybit API...")
 
-        response = requests.post(url, headers=headers, params={
-            "apiKey": api_key,
-            "recvWindow": recv_window,
-            "timestamp": timestamp,
-            "sign": signature
-        }, json=payload)
+        response = requests.post(
+            url=f"{url}?{query_string}&sign={signature}",
+            headers=headers,
+            json=payload
+        )
 
-        print("Bybit response:", response.text)
+        print("Response from Bybit:", response.text)
         return response.json()
 
     except Exception as e:
-        print("Error:", str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        print("Error occurred:", str(e))
+        return {"error": str(e)}
